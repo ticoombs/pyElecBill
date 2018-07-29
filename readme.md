@@ -1,5 +1,7 @@
 # Electricity Cost Calculation
 
+[Homepage](https://gitlab.com/ticoombs/pyElecBill)
+
 I was sick of all the different constraints and calculating my bill
 
 My current provider (AGL) allows me to download a CSV of all my data usage for the last 12 months at 30 minute incrementals.
