@@ -12,12 +12,12 @@ def rates_calc(_file):
     Takes a csv of the rates on a per day basis and their cost per kWh
     Returns a 2 dimential list of kWh X time period X per day
     """
-    with open(_file, 'rb') as ratesfile:
+    with open(_file, 'rt') as ratesfile:
         reader = csv.reader(ratesfile)
         return list(reader)
 
 
-def data_calc(_file, rates="", firstX="", restX="", first_var=""):
+def data_calc(_file, _filetype="old", rates="", firstX="", restX="", first_var=""):
     """
     Takes a csv file with "StartDate,EndDate,Usage" where each row is a 30 min interval
     Returns an array of cost per day
@@ -27,28 +27,60 @@ def data_calc(_file, rates="", firstX="", restX="", first_var=""):
     today = {}
     current = 0
 
-    with open(_file, 'rb') as csvfile:
-        stringformat = "%d/%m/%Y %I:%M:%S %p"
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            billable_time = datetime.datetime.strptime(row['StartDate'], stringformat)
-            # Day of Year
-            date = billable_time.strftime('%j')
-            # day is the day of the week as an integer, where Monday is 0 and Sunday is 6.
-            day = int(billable_time.weekday())
-            # time is the Hour
-            hour = int(billable_time.hour)
-            # end_date = datetime.datetime.strptime(row['EndDate'], stringformat)
-            kwh_usage = float(row['ProfileReadValue'])
-            # print(day, time, kwh_usage)
-            if rates:
-                total_cost[day] += (float((rates[hour][day])) * kwh_usage)
-            if firstX:
-                if current != date:
-                    current = date
-                    today[date] = kwh_usage
-                today[date] += kwh_usage
+    if _filetype != "_old":
+        #Date/Time   0:00    0:30    1:00    1:30    2:00
+        #20210927    0.076   0.086   0.076   0.085   0.077
+        with open(_file, 'rt') as csvfile:
+            dateformat = "%Y%m%d"
+            timeformat = "%H:%M"
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # each row contains an array of the date and then all usage per-30min period
+                date = datetime.datetime.strptime(row['Date/Time'], dateformat)
+                day = int(date.weekday())
+                month = int(date.month)
+                for time, value in row.items():
+                    try:
+                        data = float(value)
+                        hour = int(time.split(':')[0])
+                        if args.debug:
+                            print(f"Debug: Hour: {hour} - Value: {data}")
+                        if rates:
+                            total_cost[day] += (float((rates[hour][day])) * data)
+                        if firstX:
+                            if current != date:
+                                current = date
+                                today[date] = data
+                            today[date] += data
+                    except Exception as e:
+                        if args.debug:
+                            print(f"skipping: {time}-{value}. Err: {e}")
+
+    else:
+        with open(_file, 'rb') as csvfile:
+            stringformat = "%d/%m/%Y %I:%M:%S %p"
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                billable_time = datetime.datetime.strptime(row['StartDate'], stringformat)
+                # Day of Year
+                date = billable_time.strftime('%j')
+                # day is the day of the week as an integer, where Monday is 0 and Sunday is 6.
+                day = int(billable_time.weekday())
+                # time is the Hour
+                hour = int(billable_time.hour)
+                # end_date = datetime.datetime.strptime(row['EndDate'], stringformat)
+                kwh_usage = float(row['ProfileReadValue'])
+                # print(day, time, kwh_usage)
+                if rates:
+                    total_cost[day] += (float((rates[hour][day])) * kwh_usage)
+                if firstX:
+                    if current != date:
+                        current = date
+                        today[date] = kwh_usage
+                    today[date] += kwh_usage
     if rates:
+        if args.debug:
+            print(total_cost)
         return total_cost
     if firstX:
         # We have caluclated all usage per day
@@ -82,7 +114,7 @@ if __name__ == "__main__":
         rates_map = rates_calc(args.rates_csv)
         if args.debug:
             print(rates_map)
-        for day, value in data_calc(args.data_csv, rates_map).items():
+        for day, value in data_calc(args.data_csv, rates=rates_map).items():
             quarter += (value/100)
             print("Day: {} - Cost: {}".format(day, value/100))
         charge = float(90*float(args.supply_charge)/100)
