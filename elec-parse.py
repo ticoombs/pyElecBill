@@ -17,7 +17,7 @@ def rates_calc(_file):
         return list(reader)
 
 
-def data_calc(_file, _filetype="old", rates="", firstX="", restX="", first_var=""):
+def data_calc(_file, _filetype="_old", rates="", firstX="", restX="", first_var=""):
     """
     Takes a csv file with "StartDate,EndDate,Usage" where each row is a 30 min interval
     Returns an array of cost per day
@@ -57,11 +57,12 @@ def data_calc(_file, _filetype="old", rates="", firstX="", restX="", first_var="
                             print(f"skipping: {time}-{value}. Err: {e}")
 
     else:
-        with open(_file, 'rb') as csvfile:
-            stringformat = "%d/%m/%Y %I:%M:%S %p"
+        #print("New Format")
+        with open(_file, 'r') as csvfile:
+            stringformat = "%Y-%m-%d %H:%M:%S"
             reader = csv.DictReader(csvfile)
             for row in reader:
-                billable_time = datetime.datetime.strptime(row['StartDate'], stringformat)
+                billable_time = datetime.datetime.strptime(f"{row['ReadDate']} {row['ReadTime']}", stringformat)
                 # Day of Year
                 date = billable_time.strftime('%j')
                 # day is the day of the week as an integer, where Monday is 0 and Sunday is 6.
@@ -69,8 +70,8 @@ def data_calc(_file, _filetype="old", rates="", firstX="", restX="", first_var="
                 # time is the Hour
                 hour = int(billable_time.hour)
                 # end_date = datetime.datetime.strptime(row['EndDate'], stringformat)
-                kwh_usage = float(row['ProfileReadValue'])
-                # print(day, time, kwh_usage)
+                kwh_usage = float(row['ReadConsumption'])
+                #print(day, hour, kwh_usage)
                 if rates:
                     total_cost[day] += (float((rates[hour][day])) * kwh_usage)
                 if firstX:
@@ -78,13 +79,14 @@ def data_calc(_file, _filetype="old", rates="", firstX="", restX="", first_var="
                         current = date
                         today[date] = kwh_usage
                     today[date] += kwh_usage
+
     if rates:
         if args.debug:
             print(total_cost)
         return total_cost
     if firstX:
         # We have caluclated all usage per day
-        for days, value in today.iteritems():
+        for days, value in today.items():
             if float(value) > float(first_var):
                 rest = float(value) - float(first_var)
                 now_value = float(firstX) * float(first_var) + float(rest) * float(restX)
@@ -127,7 +129,7 @@ if __name__ == "__main__":
             restX=args.next_kwh_rate,
             first_var=args.first_kwh)
         yearly_cost = 0
-        for day, value in day_cost.iteritems():
+        for day, value in day_cost.items():
             yearly_cost += value/100
             yearly_cost += float(args.supply_charge)/100
-        print("Yearly Cost: {}".format(yearly_cost))
+        print("Quarter Cost: {}".format(yearly_cost))
